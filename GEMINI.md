@@ -2,14 +2,16 @@
 
 This project is a multi-dimensional configuration management system for Kubernetes (Gateway API) and Consul Service Mesh across multiple Environments, Data Centers, Clusters, Application Groups, Cells, and Blue/Green regions.
 
-When Gemini or Antigravity loads this workspace on any machine or laptop, it **MUST** adopt this context and follow the rules below.
+The system is designed with a **Pure Agentic Zero-Python Architecture**: all relational topology, architectural invariants, validations, queries, manifest generation, and GitOps synchronizations are governed 100% natively by Antigravity / Gemini via this guide and the Markdown relational tables under `relations/`.
+
+When Gemini or Antigravity loads this workspace on any machine or laptop, it **MUST** adopt this context and strictly adhere to the rules below.
 
 ---
 
 ## 1. Directory Structure & Layout Boundaries
 
 * **Root Directory (Organized & Modular)**:
-  * `relations/`: Directory containing GitHub Flavored Markdown (GFM) tables maintaining multi-dimensional configuration relationships:
+  * `relations/`: GitHub Flavored Markdown (GFM) tables maintaining multi-dimensional configuration relationships:
     * `environments.md`: Environments, clusters, DCs, and Consul peering topologies.
     * `application_groups.md`: Application groups and logical cells.
     * `namespaces.md`: Namespaces, blue/green regions, and APG/cell bindings.
@@ -24,12 +26,8 @@ When Gemini or Antigravity loads this workspace on any machine or laptop, it **M
     * Acts as the unified GitOps single source of truth for deployment.
   * `raw/`: Raw input manifests provided by users (e.g., `ncbs-retail-orders-route-xxxx.yaml`).
   * `examples/`: Reference manifest examples (`ServiceDefaults_example.yaml`, `HTTPRoute_example.yaml`).
-  * `tests/`: Pytest automated verification suite (`test_framework_integrity.py`).
 * **Customization & Skill Directory (`.agents/skills/manifest-management/`)**:
-  * `SKILL.md`: Skill definition and workflow runbook.
-  * `scripts/manifest-mgr`: The canonical CLI execution runner.
-  * `scripts/py_engine/`: Python engine (Relational Graph, MarkdownDB engine, parser, generator, dimension manager, sync engine).
-
+  * `SKILL.md`: Pure agentic skill definition and operational workflows.
 
 ---
 
@@ -56,86 +54,72 @@ When Gemini or Antigravity loads this workspace on any machine or laptop, it **M
        - **Region (`region`)**: e.g. `blue`, `green`
        - **Namespace (`namespace`)**: e.g. `gpi-retail-1`
    * Clearly present each file with its associated dimensional values so the user can immediately see where each configuration applies.
-   * Do NOT include unsolicited background explanations or test execution reports unless explicitly requested by the user.
+   * Do NOT include unsolicited background explanations or verbose test logs unless explicitly requested by the user.
 5. **Strict Dimensional Scope & No Default Broadcasting**:
    * When ingesting, saving, or updating a configuration or manifest, **NEVER deploy or update it into all environments or all clusters by default** if the target environment or cluster is omitted or ambiguous.
    * Apply this exact strict principle to all configuration dimensions: **Environment (`env`)**, **Cluster (`cluster`)**, **Application Group (`apg`)**, **Cell (`cell`)**, and **Region (`region`)**.
    * When an environment contains multiple clusters (e.g., UAT with `ocp53` in DCE and `ocp54` in DCW, or PROD with `ocp71` in DCE and `ocp72` in DCW), **ALWAYS stop and prompt the user for confirmation** on whether it targets a specific cluster (`ocp53` vs `ocp54`) or both clusters before committing or syncing.
    * As the strict configuration manager, if ANY dimension is missing or not explicitly declared in labels, annotations, or user instructions, **ALWAYS stop and prompt the user for clarification** (e.g., asking which environment, which cluster, which application group, which cell, or which region) before committing or syncing.
-
-6. **Query Failure Self-Healing & Test-Driven Remediation**:
-   * If any query cannot be answered properly due to an actual system defect (e.g. missing resource definition, unhandled resource schema, or validation gap):
-     1. Automatically trigger the fixing process to resolve the root cause in the `relations/*.md` tables, schema validator, or query engine.
-     2. Add a respective automated test case in `tests/test_framework_integrity.py` replicating that exact scenario to prevent regression.
-     3. If any domain requirements or unknown inputs are needed to complete the fix, always ask the user for details.
-7. **LLM Query Construction & Immutable CLI**:
-   * **Do NOT modify `cli.py`** to add one-off flags for ad-hoc queries.
-   * The LLM translates user intent into dynamic queries using:
-     - Generic query find: `$RUNNER query find [kind] [key=value ...]`
-     - Direct relation evaluation: `$RUNNER query eval '<expression>'`
-     - Or direct evaluation via MarkdownDB/Python commands.
-8. **Bidirectional Markdown & Directory Synchronization**:
-   * The human-friendly directory structure (`ApplicationGroups/<Application>/<Environment>/<Logical-Cell>/<DC>/<OCP-Cluster>/<Config-Items>/`) and Markdown relations database must remain strictly unified at all times.
-   * Manual modifications or new files in the directory hierarchy automatically sync to Markdown tables (`$RUNNER sync --to-md` or `--to-cue`).
-   * Additions or modifications in Markdown tables immediately update the directory hierarchy (`$RUNNER sync --to-dir`).
-   * Drift, orphaned manifests, and Cross-DC asymmetry are continuously audited via `$RUNNER sync --check`.
+6. **Bidirectional Markdown & Directory Consistency**:
+   * The human-friendly directory structure (`ApplicationGroups/<Application>/<Environment>/<Logical-Cell>/<DC>/<OCP-Cluster>/<Config-Items>/`) and Markdown relations database (`relations/*.md`) must remain strictly unified at all times.
+   * Any change in Markdown tables must immediately be reflected in `ApplicationGroups/`.
+   * Any change in `ApplicationGroups/` manifests must be ingested back into `relations/*.md`.
 
 ---
 
-## 3. Operational Workflows & CLI Commands
+## 3. Autonomous Agent Operational Protocols
 
-All operational tasks are performed through the skill runner script:
+Antigravity executes all operations directly by inspecting, modifying, or creating files across `relations/` and `ApplicationGroups/`:
 
-```bash
-RUNNER="./.agents/skills/manifest-management/scripts/manifest-mgr"
+### A. Query Execution Protocol
+1. **Reverse Path Lookup (e.g., "What are the routes for `/v1/retail/orders/` in PROD?")**:
+   - Read [relations/http_routes.md](file:///Users/lorenzolou/Downloads/ManifestManagementProject/relations/http_routes.md) to find rows matching the path prefix.
+   - Match parent gateway in [relations/gateways.md](file:///Users/lorenzolou/Downloads/ManifestManagementProject/relations/gateways.md) and targets in [relations/services.md](file:///Users/lorenzolou/Downloads/ManifestManagementProject/relations/services.md).
+   - Filter by requested dimensions (e.g. `env=PROD`, namespace).
+   - Return the concrete YAML files located in `ApplicationGroups/` along with complete dimensional metadata (Env, DC, Cluster, APG, Cell, Region, Namespace, File Path).
+2. **AGW Inventory Query (e.g., "What is bonded to `agw-ncbs-retail-blue`?")**:
+   - Read [relations/gateways.md](file:///Users/lorenzolou/Downloads/ManifestManagementProject/relations/gateways.md) for the AGW definition.
+   - Scan [relations/http_routes.md](file:///Users/lorenzolou/Downloads/ManifestManagementProject/relations/http_routes.md) for all routes having `Parent Gateway == <agw_name>`.
+   - Tally total bonded routes, path prefixes, accommodated backend services, and target ports.
+3. **ProxyDefaults Query (e.g., "Show ProxyDefaults for green cell in UAT ocp53")**:
+   - Read [relations/proxy_defaults.md](file:///Users/lorenzolou/Downloads/ManifestManagementProject/relations/proxy_defaults.md) matching `Environment == UAT` and `Cluster == ocp53`.
+   - Remind the user of Invariant 1: `ProxyDefaults` is cluster-global (applies to all cells and regions in that cluster).
+   - Return the YAML manifest located at `ApplicationGroups/<APG>/UAT/<Cell>/DCE/ocp53/proxydefaults/global.yaml`.
+4. **ReferenceGrant Query**:
+   - Read [relations/reference_grants.md](file:///Users/lorenzolou/Downloads/ManifestManagementProject/relations/reference_grants.md), filter by APG, cell, or namespace, and return the manifests.
 
-# 1. Bidirectional Directory & Markdown Relations Synchronization
-$RUNNER sync --to-dir       # Sync from Markdown relations to ApplicationGroups/ hierarchy
-$RUNNER sync --to-md        # Ingest manual directory changes into Markdown relations (alias: --to-cue)
-$RUNNER sync --check        # Audit consistency, drift, and cross-DC symmetry
+### B. Ingesting & Creating Manifests Protocol
+When a raw manifest is provided:
+1. Parse the document `kind` (`HTTPRoute`, `ServiceDefaults`, `ProxyDefaults`, `ReferenceGrant`, `Gateway`).
+2. Extract name, namespace, and configuration specs.
+3. Enforce namespace suffix invariant (`-1` -> Blue, `-2` -> Green).
+4. Verify dimensional scoping:
+   - Check if `env`, `cluster`, `apg`, `cell`, or `region` is clear.
+   - **If ambiguous, stop and prompt Master for confirmation** (Invariant 5).
+5. Append or update the corresponding row in the appropriate table under `relations/*.md`, keeping markdown column alignment clean.
+6. Write the concrete manifest file into the appropriate GitOps hierarchy:
+   `ApplicationGroups/<Application>/<Environment>/<Logical-Cell>/<DC>/<OCP-Cluster>/<Config-Items>/<name>.yaml`
+   - For environments with dual clusters (e.g., UAT `ocp53` and `ocp54`, or PROD `ocp71` and `ocp72`), enforce Invariant 2 (Cross-DC symmetry).
 
-# 2. Dynamic LLM-Driven Queries (No CLI modifications needed)
-$RUNNER query find grant region=blue
-$RUNNER query find route cell=retail
-$RUNNER query find gateway apg=ncbs
-$RUNNER query eval "reference_grants"
+### C. Dimensional CRUD Protocol
+When Master requests adding or modifying dimensions:
+1. **Add Environment**: Append row to [relations/environments.md](file:///Users/lorenzolou/Downloads/ManifestManagementProject/relations/environments.md).
+2. **Add Application Group**: Append row to [relations/application_groups.md](file:///Users/lorenzolou/Downloads/ManifestManagementProject/relations/application_groups.md).
+3. **Add Cell**: Append cell to [relations/application_groups.md](file:///Users/lorenzolou/Downloads/ManifestManagementProject/relations/application_groups.md).
+4. **Add Namespace**: Append row to [relations/namespaces.md](file:///Users/lorenzolou/Downloads/ManifestManagementProject/relations/namespaces.md) ensuring `-1` for Blue and `-2` for Green.
+5. **Add Service / Gateway / Route**: Append row to respective markdown tables.
+6. Automatically render/generate the corresponding YAML manifests in `ApplicationGroups/`.
 
-# 3. Reverse Path Lookup
-$RUNNER query path "/v1/retail/orders/"
-
-# 4. Cluster ProxyDefaults Query
-$RUNNER query proxy-defaults --env UAT --cluster ocp53
-
-# 5. AGW Inventory Query
-$RUNNER query agw agw-ncbs-retail-blue
-
-# 6. Gateway API ReferenceGrant Query
-$RUNNER query grant --apg ncbs
-
-# 7. Dashboard Summary
-$RUNNER summary
-
-# 8. Ingest New Manifest (ServiceDefaults, HTTPRoute, ReferenceGrant)
-$RUNNER add-manifest raw/my-manifest.yml --apg <apg> --cell <cell> --env <env> --cluster <cluster>
-
-# 9. Dynamically Add Dimension Items
-$RUNNER add-dim env STG --peering
-$RUNNER add-dim apg wealth-mgmt
-$RUNNER add-dim cell portfolio --apg wealth-mgmt
-$RUNNER add-dim ns portfolio-core-1 --apg wealth-mgmt --cell portfolio --region blue
-$RUNNER add-dim service portfolio-calc --ns portfolio-core-1 --apg wealth-mgmt --cell portfolio --region blue
-
-# 10. Validate Markdown Relations & Integrity
-$RUNNER vet
-```
-
-
----
-
-## 4. Testing & Verification
-
-Run tests anytime with `pytest`:
-```bash
-python3 -m pytest tests/ -v
-```
-All tests must pass 100% and leave the Markdown database in a clean, idempotent state.
+### D. Audit & Referential Integrity Protocol
+When requested to audit, vet, or verify consistency:
+1. **Table Schema & Integrity Checks**:
+   - Check all Data Centers are either `DCE` or `DCW`.
+   - Check all Blue namespaces end with `-1` and Green end with `-2`.
+   - Check all ports are between `1` and `65535`.
+   - Check all route paths start with `/`.
+   - Check foreign keys: each route's `Parent Gateway` exists in `gateways.md`, each service's `Namespace` exists in `namespaces.md`.
+   - Check `ProxyDefaults` singleton: strictly 1 `global` entry per cluster.
+2. **Directory & Manifest Sync Audit**:
+   - Verify every row in `relations/` has its corresponding YAML file in `ApplicationGroups/`.
+   - Verify there are no orphaned files in `ApplicationGroups/` not registered in `relations/`.
+   - Verify Cross-DC symmetry: manifests in DCE and DCW for the same environment and region must have identical content.

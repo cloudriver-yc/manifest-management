@@ -1,11 +1,11 @@
 ---
 name: manifest-management
-description: Manage multi-dimensional Kubernetes and Consul Service Mesh configurations using Markdown relational tables and Python. Supports reverse URL-path lookup to AGW/HTTPRoutes, AGW route/service inventory, ProxyDefaults inspection for specific clusters/cells, dynamic dimensional CRUD, and importing raw ServiceDefaults/HTTPRoutes.
+description: Manage multi-dimensional Kubernetes and Consul Service Mesh configurations using pure Markdown relational tables and agentic reasoning. Supports reverse URL-path lookup to AGW/HTTPRoutes, AGW route/service inventory, ProxyDefaults inspection for specific clusters/cells, dynamic dimensional CRUD, and ingesting raw ServiceDefaults/HTTPRoutes.
 ---
 
 # Multi-Dimensional Manifest & Configuration Management Skill
 
-This skill provides an intelligent, schema-validated workflow for managing multi-dimensional Kubernetes (Gateway API) and Consul Service Mesh configurations across Environments, Clusters/DCs, Application Groups, Cells, Blue/Green regions, and Namespaces.
+This skill provides an intelligent, schema-validated agentic workflow for managing multi-dimensional Kubernetes (Gateway API) and Consul Service Mesh configurations across Environments, Clusters/DCs, Application Groups, Cells, Blue/Green regions, and Namespaces without any external Python runner or scripts.
 
 ## System Topology & Dimensions
 
@@ -21,144 +21,70 @@ This skill provides an intelligent, schema-validated workflow for managing multi
    - *Note: Services, versions, and deployment topologies in Blue and Green can be independent.*
 5. **Cross-DC Symmetry**: For any environment, the same region across DCE and DCW clusters has identical configuration automatically.
 
-## Output & Interaction Policy
+---
 
-- **Manifest-First Principle with Complete Dimensional Context**: When querying or retrieving configurations (HTTPRoutes, ProxyDefaults, Gateways, ReferenceGrants, ServiceDefaults), **return the actual YAML/JSON manifests along with the exact values of all relevant dimensions** (Environment, Data Center, Cluster, Application Group, Cell, Region, Namespace) and their concrete file paths under `ApplicationGroups/`.
-- **Strict Dimensional Scope & No Default Broadcasting**: When saving, updating, or ingesting a manifest, **NEVER deploy or update it into all environments or all clusters by default** if the target environment or cluster is omitted or ambiguous. Apply this exact strict principle to all dimensions (**Environment**, **Cluster**, **Application Group**, **Cell**, **Region**). When an environment contains multiple clusters (e.g., UAT with `ocp53` in DCE and `ocp54` in DCW, or PROD with `ocp71` in DCE and `ocp72` in DCW), **ALWAYS stop and prompt the user for confirmation** on whether it targets a specific cluster (`ocp53` vs `ocp54`) or both clusters before applying or syncing. If any dimension is missing or unclear, **always prompt the user** for details instead of making assumptions.
+## Agent Operational Workflows
 
-- **Query Failure Self-Healing & Test-Driven Remediation**: If any query cannot be answered properly (e.g. unhandled query type, schema gap, parsing bug, or missing resource representation):
-  1. Trigger the fixing process immediately to resolve the underlying issue in `relations/*.md`, the schema validator, or `py_engine/`.
-  2. Add a dedicated automated test case in `tests/test_framework_integrity.py` replicating the exact query failure to prevent regressions.
-  3. If domain knowledge or unknown configuration parameters are needed, always ask the user for details.
-- If a queried item is not found, output a clear comment `# Not found: <reason>` followed by the minimal template to register it.
+Antigravity operates directly on the Markdown relational database in `relations/*.md` and the deployment manifests under `ApplicationGroups/`.
+
+### 1. READ / QUERY WORKFLOWS
+
+#### A. Reverse Path Lookup
+*User Prompt Example*: *"What are the httproutes for `/v1/retail/orders/` in prod?"*
+1. Read `relations/http_routes.md` using `view_file`.
+2. Find rows where `Path` matches or is a prefix of the target path.
+3. Cross-reference `Parent Gateway` in `relations/gateways.md` and target service in `relations/services.md`.
+4. Locate the concrete YAML manifest file under `ApplicationGroups/<Application>/<Environment>/<Logical-Cell>/<DC>/<OCP-Cluster>/httproutes/`.
+5. Return the manifest content along with complete dimensional attributes (Env, DC, Cluster, APG, Cell, Region, Namespace, File Path).
+
+#### B. AGW Inventory Query
+*User Prompt Example*: *"What routes and services are bonded to `agw-ncbs-retail-blue`?"*
+1. Read `relations/gateways.md` to verify the AGW parameters.
+2. Read `relations/http_routes.md` filtering rows where `Parent Gateway` equals the specified AGW.
+3. Tally total bonded routes, path prefixes, unique accommodated backend services, and target ports.
+4. Return an organized inventory breakdown.
+
+#### C. Cluster ProxyDefaults Query
+*User Prompt Example*: *"Show ProxyDefaults for green cell in UAT ocp53"*
+1. Remind the user: `ProxyDefaults` in Consul Service Mesh is a mesh-wide global singleton (`name: global`) for the cluster, applying across all cells and regions.
+2. Read `relations/proxy_defaults.md` for cluster `ocp53` in `UAT`.
+3. Read and return the manifest file: `ApplicationGroups/<APG>/UAT/<Cell>/DCE/ocp53/proxydefaults/global.yaml`.
+
+#### D. ReferenceGrant Query
+*User Prompt Example*: *"What ReferenceGrants exist for APG ncbs?"*
+1. Read `relations/reference_grants.md` filtering by APG.
+2. Return matching YAML manifests and concrete file paths.
 
 ---
 
-## Core Operational Workflows (CRUD)
+### 2. CREATE & INGEST WORKFLOWS
 
-All operations are executed via the CLI runner located in the workspace: `./.agents/skills/manifest-management/scripts/manifest-mgr <command>`
+#### A. Ingesting Raw Manifests
+*User Prompt Example*: *"Ingest `raw/ncbs-retail-orders-route-1.yaml` for UAT"*
+1. Read the manifest using `view_file` and parse kind, name, namespace, and rules.
+2. Determine region from namespace suffix (`-1` -> Blue, `-2` -> Green).
+3. **Strict Dimensional Scope Check**: If target cluster or environment has multiple possibilities (e.g. UAT has `ocp53` in DCE and `ocp54` in DCW), prompt the user for confirmation before writing.
+4. Append/update the appropriate row in `relations/http_routes.md` (or relevant relation table), preserving column formatting.
+5. Generate the target YAML manifest and write it to:
+   `ApplicationGroups/<Application>/<Environment>/<Logical-Cell>/<DC>/<OCP-Cluster>/<Config-Items>/<name>.yaml`
+6. Enforce Cross-DC symmetry if the environment is multi-cluster.
 
-### 1. READ / QUERY
-
-#### A. Dynamic LLM Query Construction (Recommended for Ad-Hoc Inquiries)
-The LLM directly translates natural language into dynamic query filters without needing any code changes to `cli.py`:
-```bash
-# Find any resource matching arbitrary key-value pairs or text
-./.agents/skills/manifest-management/scripts/manifest-mgr query find grant region=blue
-./.agents/skills/manifest-management/scripts/manifest-mgr query find route cell=retail
-./.agents/skills/manifest-management/scripts/manifest-mgr query find gateway apg=ncbs
-
-# Evaluate any relation expression directly
-./.agents/skills/manifest-management/scripts/manifest-mgr query eval "reference_grants"
-```
-
-#### B. Reverse Lookup: Find AGW and Route for a URL Path
-Quickly identify which AGW and HTTPRoute accommodates a path like `/v1/retail/orders/` or `/v1/xxxxx/yyyy/`:
-```bash
-./.agents/skills/manifest-management/scripts/manifest-mgr query path "/v1/retail/orders/"
-```
-**Output provides**: Matched route name, parent AGW name, namespace, APG, cell, region, match type, and backend service targets.
-
-#### C. AGW Inventory: Count Bonded Routes and Services
-Inspect an AGW to see all bonded HTTPRoutes and accommodated services:
-```bash
-./.agents/skills/manifest-management/scripts/manifest-mgr query agw agw-ncbs-retail-blue
-```
-**Output provides**: Total count of bonded HTTPRoutes, list of routes with path prefixes, total unique accommodated services, and backend port/namespace bindings.
-
-#### D. Cluster ProxyDefaults Inspection
-In Consul Service Mesh, `ProxyDefaults` is a mesh-wide global configuration (strictly 1 per Consul cluster) that applies across all cells (Retail, PayLah, Common) and regions (Blue, Green). Inspect the active cluster-global defaults via:
-```bash
-./.agents/skills/manifest-management/scripts/manifest-mgr query proxy-defaults --env UAT --cluster ocp53
-```
-*(If `--cell` or `--region` is supplied, the tool will explain that ProxyDefaults is cluster-global and return the cluster's active `global` configuration).*
-
-#### E. ReferenceGrant Inspection
-Query active Gateway API `ReferenceGrant` configurations for cross-namespace routing permissions:
-```bash
-./.agents/skills/manifest-management/scripts/manifest-mgr query grant --apg ncbs
-```
-
-#### F. System Summary & Metrics
-Get a bird's-eye view of all registered environments, APGs, gateways, routes, and services:
-```bash
-./.agents/skills/manifest-management/scripts/manifest-mgr summary
-```
+#### B. Adding New Dimensions
+*User Prompt Example*: *"Add a new cell `portfolio` to APG `wealth-mgmt`"*
+1. Read `relations/application_groups.md`.
+2. Add a new row formatted with proper pipe separators and padding.
+3. Save the file using `replace_file_content` or `write_to_file`.
 
 ---
 
-## 2. CREATE
+### 3. AUDIT & CONSISTENCY WORKFLOWS
 
-#### A. Ingest a Manifest (`ServiceDefaults.yaml` or `HTTPRoute.yaml`)
-Automatically parses metadata, detects region from namespace suffix (`-1` -> Blue, `-2` -> Green), derives APG and Cell, binds to parent AGW, and registers routes:
-```bash
-./.agents/skills/manifest-management/scripts/manifest-mgr add-manifest examples/ServiceDefaults_example.yaml --apg ncbs --cell common --agw agw-ncbs-common-blue --path /v1/common/payment/
-```
-
-#### B. Dynamically Add New Dimensions
-- **Add a new Environment**:
-  ```bash
-  ./.agents/skills/manifest-management/scripts/manifest-mgr add-dim env STG --peering
-  ```
-- **Add a new Application Group (APG)**:
-  ```bash
-  ./.agents/skills/manifest-management/scripts/manifest-mgr add-dim apg wealth-mgmt
-  ```
-- **Add a new Logical Cell**:
-  ```bash
-  ./.agents/skills/manifest-management/scripts/manifest-mgr add-dim cell portfolio --apg wealth-mgmt --desc "Portfolio Cell"
-  ```
-- **Add a new Namespace**:
-  ```bash
-  ./.agents/skills/manifest-management/scripts/manifest-mgr add-dim ns portfolio-core-1 --apg wealth-mgmt --cell portfolio --region blue
-  ```
-- **Add a new Service**:
-  ```bash
-  ./.agents/skills/manifest-management/scripts/manifest-mgr add-dim service portfolio-calc --ns portfolio-core-1 --apg wealth-mgmt --cell portfolio --region blue --version v1.0.0 --port 8080
-  ```
-
----
-
-## 3. UPDATE
-
-To update routes or configurations:
-- Re-run `add-manifest` with updated attributes or modify Markdown entries directly in `relations/*.md`.
-- Verify Markdown correctness:
-  ```bash
-  ./.agents/skills/manifest-management/scripts/manifest-mgr vet
-  ```
-
----
-
-## 4. DELETE
-
-Decommission an item by removing its row from the appropriate table in `relations/*.md` or using Python DimensionManager:
-```python
-from py_engine.dimension_mgr import DimensionManager
-dm = DimensionManager()
-dm.delete_item("services", "serviceA-blue")
-```
-
----
-
-## 5. GITOPS DIRECTORY SYNCHRONIZATION
-
-Maintains continuous bidirectional synchronization between the Markdown relational database (`relations/`) and the human-friendly GitOps directory structure under `ApplicationGroups/`:
-`ApplicationGroups/<Application>/<Environment>/<Logical-Cell>/<DC>/<OCP-Cluster>/<Config-Items>/`
-
-GitOps engines (e.g., ArgoCD / Flux) point directly to `ApplicationGroups/`, which acts as the single source of truth for cluster deployments:
-
-```bash
-# 1. Sync Markdown state into ApplicationGroups/ directory hierarchy
-./.agents/skills/manifest-management/scripts/manifest-mgr sync --to-dir
-
-# 2. Ingest manual directory changes/files from ApplicationGroups/ into Markdown relations
-./.agents/skills/manifest-management/scripts/manifest-mgr sync --to-md
-
-# 3. Audit consistency, drift, missing files, and cross-DC symmetry
-./.agents/skills/manifest-management/scripts/manifest-mgr sync --check
-
-# 4. Optional: compile and export to a specific target directory
-./.agents/skills/manifest-management/scripts/manifest-mgr export --env UAT --out /path/to/dir
-```
-
+*User Prompt Example*: *"Audit configuration relations and directory consistency"*
+1. Verify relational table integrity across `relations/*.md`:
+   - Namespaces follow `-1` (blue) and `-2` (green) suffix rules.
+   - Ports are between 1 and 65535.
+   - Data Centers are `DCE` or `DCW`.
+   - ProxyDefaults has strictly 1 entry per cluster.
+2. Verify directory synchronization:
+   - Walk `ApplicationGroups/` and ensure all files match entries in `relations/*.md`.
+   - Report any drift, orphaned manifests, or Cross-DC asymmetry.

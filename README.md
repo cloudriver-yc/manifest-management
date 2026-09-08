@@ -2,6 +2,8 @@
 
 A multi-dimensional configuration management system for Kubernetes (Gateway API) and Consul Service Mesh across multiple Environments, Data Centers, Clusters, Application Groups, Cells, and Blue/Green regions.
 
+The project operates on a **Pure Agentic Zero-Python Architecture**: all configuration relationships, architectural invariants, queries, manifest ingestion, and GitOps deployments are governed 100% natively by Antigravity / Gemini via [GEMINI.md](GEMINI.md) and human-friendly GitHub Flavored Markdown (GFM) tables under `relations/`.
+
 ---
 
 ## 1. Directory Structure
@@ -20,52 +22,45 @@ manifest-management/
 │   └── reference_grants.md           # Gateway API ReferenceGrants
 ├── ApplicationGroups/                # Direct GitOps deployment single source of truth
 │   └── <Application>/<Environment>/<Logical-Cell>/<DC>/<OCP-Cluster>/<Config-Items>/
+├── raw/                              # Input manifests provided for ingestion
 ├── examples/                         # Reference manifests
-├── tests/                            # Automated test suite
-├── GEMINI.md                         # Project Context, Architectural Invariants & Agent Rules
+├── GEMINI.md                         # Project Context, Architectural Invariants & Agent Operating Rules
 └── .agents/
-    └── skills/manifest-management/   # Management runner script and Python engine
+    └── skills/manifest-management/   # Pure agentic skill runbook (SKILL.md)
 ```
 
 ---
 
-## 2. Core CLI Commands
+## 2. Autonomous Agent Interactions
 
-Use the canonical runner script located under `.agents/skills/manifest-management/scripts/manifest-mgr`:
+You interact directly with Antigravity through natural language prompts. Antigravity reads and manages the Markdown tables and GitOps files directly:
 
-```bash
-RUNNER="./.agents/skills/manifest-management/scripts/manifest-mgr"
+### Reverse Path Lookup
+> *"What are the httproutes for `/v1/retail/orders/` in prod?"*
+- Antigravity scans `relations/http_routes.md`, cross-references `gateways.md` and `services.md`, and returns the exact YAML manifests with full dimensional values (Env, DC, Cluster, APG, Cell, Region, Namespace) and concrete file paths in `ApplicationGroups/`.
 
-# Schema & relational validation
-$RUNNER vet
+### AGW Inventory
+> *"What routes and services are bonded to `agw-ncbs-retail-blue`?"*
+- Antigravity analyzes the bonded HTTPRoutes, path prefixes, target backend services, and ports.
 
-# Dashboard overview
-$RUNNER summary
+### Cluster ProxyDefaults
+> *"Show ProxyDefaults for green cell in UAT ocp53"*
+- Antigravity enforces the cluster-global singleton invariant (applies across all cells and regions) and returns `ApplicationGroups/<APG>/UAT/<Cell>/DCE/ocp53/proxydefaults/global.yaml`.
 
-# Bidirectional GitOps synchronization
-$RUNNER sync --to-dir       # Sync Markdown relations into ApplicationGroups/ hierarchy
-$RUNNER sync --to-md        # Ingest manual directory changes from ApplicationGroups/ into relations
-$RUNNER sync --check        # Audit consistency, drift, and cross-DC symmetry
+### Manifest Ingestion
+> *"Ingest `raw/orders-route.yaml` for UAT retail"*
+- Antigravity parses metadata, prompts for any ambiguous dimensions (preventing accidental default broadcasting), updates `relations/http_routes.md`, and generates the target manifest under `ApplicationGroups/` ensuring Cross-DC symmetry.
 
-# Dynamic queries
-$RUNNER query find route path=/v1/retail/orders/ env=prod
-$RUNNER query proxy-defaults --env UAT --cluster ocp53
-$RUNNER query grant --apg ncbs
-
-# Dynamic dimension registration
-$RUNNER add-dim env <NAME> [--peering]
-$RUNNER add-dim apg <NAME>
-$RUNNER add-dim cell <CELL> --apg <APG>
-$RUNNER add-dim ns <NS> --apg <APG> --cell <CELL> --region <blue|green>
-$RUNNER add-dim service <SVC> --ns <NS> --apg <APG> --cell <CELL>
-```
+### Relational & GitOps Audit
+> *"Audit configuration relations and directory consistency"*
+- Antigravity verifies table referential integrity (port boundaries, Blue/Green `-1`/`-2` suffixes, DC values) and checks for drift or orphaned files against `ApplicationGroups/`.
 
 ---
 
-## 3. Testing & Verification
+## 3. Core Invariants
 
-Run automated tests using pytest:
-
-```bash
-python3 -m pytest tests/ -v
-```
+1. **ProxyDefaults Singleton**: Strictly 1 mesh-wide global `ProxyDefaults` (`name: global`) per Consul cluster.
+2. **Cross-DC Symmetry**: Dual-cluster peered environments (e.g. DCE `ocp53` and DCW `ocp54` in UAT) have identical configurations in the same region.
+3. **Blue/Green Suffixes**: Namespaces end with `-1` for Blue and `-2` for Green.
+4. **Manifest-First Principle**: Queries always return concrete YAML manifests with full dimensional metadata and file paths.
+5. **Strict Dimensional Scope**: The agent will never broadcast manifests across clusters or environments without explicit confirmation.
