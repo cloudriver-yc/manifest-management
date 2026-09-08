@@ -5,11 +5,11 @@ set -e
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 export PYTHONPATH="${SCRIPT_DIR}:${PYTHONPATH}"
 
-# Auto-detect CUE database workspace root if not already set
+# Auto-detect workspace root if not already set
 if [ -z "${WORKSPACE_ROOT}" ]; then
   DIR="$(pwd)"
   while [ "$DIR" != "/" ]; do
-    if [ -f "$DIR/cue.mod/module.cue" ] || [ -d "$DIR/cue.mod" ]; then
+    if [ -d "$DIR/relations" ] || [ -f "$DIR/GEMINI.md" ]; then
       export WORKSPACE_ROOT="$DIR"
       break
     fi

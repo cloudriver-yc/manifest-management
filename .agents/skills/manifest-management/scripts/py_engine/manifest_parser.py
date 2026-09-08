@@ -5,18 +5,18 @@ from pathlib import Path
 from typing import Any, Dict, Optional
 import yaml
 
-from .cue_client import CueClient, find_workspace_root
+from .markdown_db import MarkdownDB, find_workspace_root
 from .dimension_mgr import DimensionManager
 from .graph import RelationalGraph
 
 
 class ManifestParser:
-    """Ingests raw YAML/JSON manifests and updates the CUE configuration."""
+    """Ingests raw YAML/JSON manifests and updates the Markdown configuration."""
 
     def __init__(self, workspace_root: Optional[str] = None):
         self.workspace_root = Path(workspace_root) if workspace_root else find_workspace_root()
-        self.cue_client = CueClient(str(self.workspace_root))
-        self.graph = RelationalGraph(self.cue_client)
+        self.db = MarkdownDB(str(self.workspace_root))
+        self.graph = RelationalGraph(self.db)
         self.dim_mgr = DimensionManager(str(self.workspace_root))
 
     def parse_manifest_file(

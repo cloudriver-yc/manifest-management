@@ -4,7 +4,7 @@ import re
 from typing import Any, Dict, List, Optional, Set, Tuple
 import yaml
 
-from .cue_client import CueClient, find_workspace_root
+from .markdown_db import MarkdownDB, find_workspace_root
 from .dimension_mgr import DimensionManager
 from .generator import ManifestGenerator
 from .graph import RelationalGraph
@@ -64,8 +64,8 @@ class SyncEngine:
     def __init__(self, workspace_root: Optional[str] = None):
         self.workspace_root = Path(workspace_root) if workspace_root else find_workspace_root()
         self.app_groups_dir = self.workspace_root / "ApplicationGroups"
-        self.cue_client = CueClient(str(self.workspace_root))
-        self.graph = RelationalGraph(self.cue_client)
+        self.db = MarkdownDB(str(self.workspace_root))
+        self.graph = RelationalGraph(self.db)
         self.dim_mgr = DimensionManager(str(self.workspace_root))
         self.generator = ManifestGenerator(str(self.workspace_root))
 
@@ -231,10 +231,10 @@ class SyncEngine:
                 if res:
                     processed.append(res)
 
-        # Validate unified CUE catalog
-        ok, err = self.cue_client.vet()
+        # Validate unified Markdown relations catalog
+        ok, err = self.db.vet()
         if not ok:
-            raise RuntimeError(f"CUE validation failed after ingesting directory files:\n{err}")
+            raise RuntimeError(f"Markdown relations validation failed after ingesting directory files:\n{err}")
 
         self.refresh()
         return {
@@ -450,7 +450,7 @@ class SyncEngine:
     def check_consistency(self) -> Dict[str, Any]:
         """Performs a comprehensive bidirectional audit between CUE and disk."""
         self.refresh()
-        ok_vet, vet_err = self.cue_client.vet()
+        ok_vet, vet_err = self.db.vet()
         schema_errors = []
         if not ok_vet:
             schema_errors.append(vet_err)

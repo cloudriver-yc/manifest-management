@@ -9,24 +9,26 @@ When Gemini or Antigravity loads this workspace on any machine or laptop, it **M
 ## 1. Directory Structure & Layout Boundaries
 
 * **Root Directory (Organized & Modular)**:
-  * `cue/`: Parent directory containing the complete CUE configuration database:
-    * `cue.mod/`: CUE module root (`manifest.management`).
-    * `schema/`: CUE schemas (`topology.cue`, `gateway.cue`, `consul.cue`, `root.cue`).
-    * `catalog/`: Active configuration database:
-      * `apgs/`: Application Group definitions (`ncbs.cue`, `branch_connect.cue`).
-      * `environments/`: Environment topologies (`envs.cue`: DEV, SIT, UAT, PT, PAT, PROD).
-      * `extensions/`: Dynamically added dimensions and manifests (`custom.cue`).
-      * `system.cue`: Unified configuration entrypoint.
+  * `relations/`: Directory containing GitHub Flavored Markdown (GFM) tables maintaining multi-dimensional configuration relationships:
+    * `environments.md`: Environments, clusters, DCs, and Consul peering topologies.
+    * `application_groups.md`: Application groups and logical cells.
+    * `namespaces.md`: Namespaces, blue/green regions, and APG/cell bindings.
+    * `services.md`: Services, ports, and version definitions.
+    * `gateways.md`: Application Gateways (AGW), listeners, and hostnames.
+    * `http_routes.md`: HTTPRoutes, path bindings, match types, and targets.
+    * `service_defaults.md`: Consul ServiceDefaults configurations.
+    * `proxy_defaults.md`: Consul cluster-global ProxyDefaults configurations.
+    * `reference_grants.md`: Gateway API cross-namespace ReferenceGrants.
   * `ApplicationGroups/`: Parent directory for all human-friendly configuration hierarchies:
     * `<Application>/<Environment>/<Logical-Cell>/<DC>/<OCP-Cluster>/<Config-Items>/` (e.g., `ApplicationGroups/NCBS/uat/retail/DCE/ocp53/httproutes/`).
     * Acts as the unified GitOps single source of truth for deployment.
   * `raw/`: Raw input manifests provided by users (e.g., `ncbs-retail-orders-route-xxxx.yaml`).
   * `examples/`: Reference manifest examples (`ServiceDefaults_example.yaml`, `HTTPRoute_example.yaml`).
-  * `tests/`: Pytest automated verification suite (`test_crud_workflows.py`, `test_sync_workflows.py`).
+  * `tests/`: Pytest automated verification suite (`test_framework_integrity.py`).
 * **Customization & Skill Directory (`.agents/skills/manifest-management/`)**:
   * `SKILL.md`: Skill definition and workflow runbook.
   * `scripts/manifest-mgr`: The canonical CLI execution runner.
-  * `scripts/py_engine/`: Python engine (Relational Graph, CUE client, parser, generator, dimension manager, sync engine).
+  * `scripts/py_engine/`: Python engine (Relational Graph, MarkdownDB engine, parser, generator, dimension manager, sync engine).
 
 
 ---
@@ -62,20 +64,20 @@ When Gemini or Antigravity loads this workspace on any machine or laptop, it **M
    * As the strict configuration manager, if ANY dimension is missing or not explicitly declared in labels, annotations, or user instructions, **ALWAYS stop and prompt the user for clarification** (e.g., asking which environment, which cluster, which application group, which cell, or which region) before committing or syncing.
 
 6. **Query Failure Self-Healing & Test-Driven Remediation**:
-   * If any query cannot be answered properly due to an actual system defect (e.g. missing resource definition, unhandled resource schema, or CUE bug):
-     1. Automatically trigger the fixing process to resolve the root cause in the schema, catalog, or query engine.
-     2. Add a respective automated test case in `tests/test_crud_workflows.py` replicating that exact scenario to prevent regression.
+   * If any query cannot be answered properly due to an actual system defect (e.g. missing resource definition, unhandled resource schema, or validation gap):
+     1. Automatically trigger the fixing process to resolve the root cause in the `relations/*.md` tables, schema validator, or query engine.
+     2. Add a respective automated test case in `tests/test_framework_integrity.py` replicating that exact scenario to prevent regression.
      3. If any domain requirements or unknown inputs are needed to complete the fix, always ask the user for details.
 7. **LLM Query Construction & Immutable CLI**:
    * **Do NOT modify `cli.py`** to add one-off flags for ad-hoc queries.
    * The LLM translates user intent into dynamic queries using:
      - Generic query find: `$RUNNER query find [kind] [key=value ...]`
-     - Direct CUE expression evaluation: `$RUNNER query eval '<expression>'`
-     - Or direct evaluation via CUE/Python commands.
-8. **Bidirectional CUE & Directory Synchronization**:
-   * The human-friendly directory structure (`ApplicationGroups/<Application>/<Environment>/<Logical-Cell>/<DC>/<OCP-Cluster>/<Config-Items>/`) and CUE database must remain strictly unified at all times.
-   * Manual modifications or new files in the directory hierarchy automatically sync to CUE (`$RUNNER sync --to-cue`).
-   * Schema or dimension additions in CUE immediately update the directory hierarchy (`$RUNNER sync --to-dir`).
+     - Direct relation evaluation: `$RUNNER query eval '<expression>'`
+     - Or direct evaluation via MarkdownDB/Python commands.
+8. **Bidirectional Markdown & Directory Synchronization**:
+   * The human-friendly directory structure (`ApplicationGroups/<Application>/<Environment>/<Logical-Cell>/<DC>/<OCP-Cluster>/<Config-Items>/`) and Markdown relations database must remain strictly unified at all times.
+   * Manual modifications or new files in the directory hierarchy automatically sync to Markdown tables (`$RUNNER sync --to-md` or `--to-cue`).
+   * Additions or modifications in Markdown tables immediately update the directory hierarchy (`$RUNNER sync --to-dir`).
    * Drift, orphaned manifests, and Cross-DC asymmetry are continuously audited via `$RUNNER sync --check`.
 
 ---
@@ -87,16 +89,16 @@ All operational tasks are performed through the skill runner script:
 ```bash
 RUNNER="./.agents/skills/manifest-management/scripts/manifest-mgr"
 
-# 1. Bidirectional Directory & CUE Synchronization
-$RUNNER sync --to-dir       # Sync from CUE database to ApplicationGroups/ hierarchy
-$RUNNER sync --to-cue       # Ingest manual directory changes into CUE
+# 1. Bidirectional Directory & Markdown Relations Synchronization
+$RUNNER sync --to-dir       # Sync from Markdown relations to ApplicationGroups/ hierarchy
+$RUNNER sync --to-md        # Ingest manual directory changes into Markdown relations (alias: --to-cue)
 $RUNNER sync --check        # Audit consistency, drift, and cross-DC symmetry
 
 # 2. Dynamic LLM-Driven Queries (No CLI modifications needed)
 $RUNNER query find grant region=blue
 $RUNNER query find route cell=retail
 $RUNNER query find gateway apg=ncbs
-$RUNNER query eval "system.reference_grants"
+$RUNNER query eval "reference_grants"
 
 # 3. Reverse Path Lookup
 $RUNNER query path "/v1/retail/orders/"
@@ -123,7 +125,7 @@ $RUNNER add-dim cell portfolio --apg wealth-mgmt
 $RUNNER add-dim ns portfolio-core-1 --apg wealth-mgmt --cell portfolio --region blue
 $RUNNER add-dim service portfolio-calc --ns portfolio-core-1 --apg wealth-mgmt --cell portfolio --region blue
 
-# 10. Validate CUE Schemas & Integrity
+# 10. Validate Markdown Relations & Integrity
 $RUNNER vet
 ```
 
@@ -136,4 +138,4 @@ Run tests anytime with `pytest`:
 ```bash
 python3 -m pytest tests/ -v
 ```
-All tests must pass 100% and leave the CUE database in a clean, idempotent state.
+All tests must pass 100% and leave the Markdown database in a clean, idempotent state.

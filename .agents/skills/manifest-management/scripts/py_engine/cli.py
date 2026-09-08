@@ -3,7 +3,7 @@ import json
 import sys
 from typing import Optional
 import yaml
-from .cue_client import CueClient
+from .markdown_db import MarkdownDB
 from .dimension_mgr import DimensionManager
 from .generator import ManifestGenerator
 from .graph import RelationalGraph
@@ -291,11 +291,11 @@ def handle_query_find(args, graph: RelationalGraph):
         print()
 
 
-def handle_query_eval(args, cue_client: CueClient):
+def handle_query_eval(args, db: MarkdownDB):
     output_fmt = getattr(args, "output", "yaml")
     expr = args.expr
     try:
-        data = cue_client.eval_expression(expr)
+        data = db.eval_expression(expr)
         if output_fmt in ["yaml", "manifest"]:
             print(yaml.dump(data, sort_keys=False).strip())
         else:
@@ -409,8 +409,8 @@ def handle_sync(args):
         print("\n========================================================")
         print(" Bidirectional Sync & Consistency Audit Report")
         print("========================================================")
-        print(f" Total Expected Manifests (CUE) : {res['stats']['total_expected_manifests']}")
-        print(f" Total Discovered Manifests (Disk): {res['stats']['total_disk_manifests']}")
+        print(f" Total Expected Manifests (Relations) : {res['stats']['total_expected_manifests']}")
+        print(f" Total Discovered Manifests (Disk)    : {res['stats']['total_disk_manifests']}")
 
         if res["schema_errors"]:
             print("\n[-] Schema Validation Errors:")
@@ -440,30 +440,30 @@ def handle_sync(args):
                 print(f"      DCW: {a['dcw_file']}")
 
         if res["is_synced"]:
-            print("\n[+] Success: CUE configuration and Directory hierarchy are 100% synchronized and consistent!\n")
+            print("\n[+] Success: Markdown relations and Directory hierarchy are 100% synchronized and consistent!\n")
             sys.exit(0)
         else:
-            print("\n[!] Discrepancies detected between CUE and Directory hierarchy.\n")
+            print("\n[!] Discrepancies detected between Markdown relations and Directory hierarchy.\n")
             sys.exit(1)
 
-    elif args.to_cue:
+    elif getattr(args, "to_md", False) or getattr(args, "to_cue", False):
         res = engine.sync_dir_to_cue()
-        print(f"\n[+] Synchronized Directory -> CUE: Processed {res['total_processed']} manifest(s) successfully.")
+        print(f"\n[+] Synchronized Directory -> Markdown relations: Processed {res['total_processed']} manifest(s) successfully.")
         for p in res["processed"]:
             print(f"    • Ingested {p.get('kind')} '{p.get('name')}' for {p.get('apg')}/{p.get('cell')} ({p.get('env')})")
         print()
 
     elif args.to_dir:
         res = engine.sync_cue_to_dir(env_filter=args.env, prune=args.prune)
-        print(f"\n[+] Synchronized CUE -> Directory: Generated/Updated {res['total_updated']} file(s).")
+        print(f"\n[+] Synchronized Relations -> Directory: Generated/Updated {res['total_updated']} file(s).")
         if res["pruned"]:
             print(f"    Pruned {res['total_pruned']} obsolete file(s).")
         print()
 
     else:
-        # Default: CUE -> Directory
+        # Default: Relations -> Directory
         res = engine.sync_cue_to_dir(env_filter=args.env, prune=args.prune)
-        print(f"\n[+] Synchronized CUE -> Directory: Generated/Updated {res['total_updated']} file(s).")
+        print(f"\n[+] Synchronized Relations -> Directory: Generated/Updated {res['total_updated']} file(s).")
         if res["pruned"]:
             print(f"    Pruned {res['total_pruned']} obsolete file(s).")
         print()
@@ -548,34 +548,34 @@ def main():
     exp.add_argument("--out", help="Output directory path (default: output/)")
 
     # Subcommand: sync
-    sync_p = subparsers.add_parser("sync", help="Bidirectional synchronization between CUE and hierarchical directory structure")
-    sync_p.add_argument("--to-dir", action="store_true", help="Sync from CUE to directory hierarchy")
-    sync_p.add_argument("--to-cue", action="store_true", help="Sync from directory hierarchy to CUE")
+    sync_p = subparsers.add_parser("sync", help="Bidirectional synchronization between Markdown relations and hierarchical directory structure")
+    sync_p.add_argument("--to-dir", action="store_true", help="Sync from Markdown relations to directory hierarchy")
+    sync_p.add_argument("--to-md", "--to-cue", dest="to_md", action="store_true", help="Sync from directory hierarchy to Markdown relations")
     sync_p.add_argument("--check", action="store_true", help="Audit and verify consistency without making changes")
     sync_p.add_argument("--env", help="Filter by environment (optional)")
-    sync_p.add_argument("--prune", action="store_true", help="Remove orphaned files in directory not present in CUE")
+    sync_p.add_argument("--prune", action="store_true", help="Remove orphaned files in directory not present in relations")
 
     # Subcommand: summary
     subparsers.add_parser("summary", help="Show system dashboard overview")
 
     # Subcommand: vet
-    subparsers.add_parser("vet", help="Validate CUE schemas and files")
+    subparsers.add_parser("vet", help="Validate Markdown relations schemas and integrity")
 
     args = parser.parse_args()
 
-    cue_client = CueClient()
+    db = MarkdownDB()
 
     if args.command == "vet":
-        ok, out = cue_client.vet()
+        ok, out = db.vet()
         if ok:
-            print("[+] All CUE schemas and definitions are valid!")
+            print("[+] All Markdown relations and definitions are valid!")
         else:
             print(f"[-] Validation failed:\n{out}")
             sys.exit(1)
         return
 
     if args.command == "summary":
-        graph = RelationalGraph(cue_client)
+        graph = RelationalGraph(db)
         handle_summary(graph)
         return
 
@@ -584,7 +584,7 @@ def main():
         return
 
     if args.command == "query":
-        graph = RelationalGraph(cue_client)
+        graph = RelationalGraph(db)
         if args.query_target == "path":
             handle_query_path(args, graph)
         elif args.query_target == "agw":
@@ -596,7 +596,7 @@ def main():
         elif args.query_target == "find":
             handle_query_find(args, graph)
         elif args.query_target == "eval":
-            handle_query_eval(args, cue_client)
+            handle_query_eval(args, db)
 
     elif args.command == "add-manifest":
         handle_add_manifest(args)

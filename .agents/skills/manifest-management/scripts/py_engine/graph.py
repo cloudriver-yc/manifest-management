@@ -1,18 +1,18 @@
 from typing import Any, Dict, List, Optional
-from .cue_client import CueClient
+from .markdown_db import MarkdownDB
 
 
 class RelationalGraph:
-    """In-memory relational query graph indexing CUE configurations."""
+    """In-memory relational query graph indexing Markdown configurations."""
 
-    def __init__(self, cue_client: Optional[CueClient] = None):
-        self.cue = cue_client or CueClient()
+    def __init__(self, db: Optional[MarkdownDB] = None):
+        self.db = db or MarkdownDB()
         self.data: Dict[str, Any] = {}
         self.refresh()
 
     def refresh(self):
-        """Reloads the unified data from CUE."""
-        self.data = self.cue.export_system()
+        """Reloads the unified data from Markdown relations."""
+        self.data = self.db.export_system()
 
     @property
     def environments(self) -> Dict[str, Any]:

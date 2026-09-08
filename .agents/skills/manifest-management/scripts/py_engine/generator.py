@@ -2,7 +2,7 @@ import os
 from pathlib import Path
 from typing import Any, Dict, Optional
 import yaml
-from .cue_client import CueClient, find_workspace_root
+from .markdown_db import MarkdownDB, find_workspace_root
 from .graph import RelationalGraph
 
 
@@ -11,8 +11,8 @@ class ManifestGenerator:
 
     def __init__(self, workspace_root: Optional[str] = None):
         self.workspace_root = Path(workspace_root) if workspace_root else find_workspace_root()
-        self.cue_client = CueClient(str(self.workspace_root))
-        self.graph = RelationalGraph(self.cue_client)
+        self.db = MarkdownDB(str(self.workspace_root))
+        self.graph = RelationalGraph(self.db)
 
     def export_all(self, target_dir: Optional[str] = None, env_filter: Optional[str] = None) -> Dict[str, Any]:
         """Compiles and exports manifests across environments and clusters."""

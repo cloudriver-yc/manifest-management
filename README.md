@@ -8,10 +8,16 @@ A multi-dimensional configuration management system for Kubernetes (Gateway API)
 
 ```
 manifest-management/
-├── cue/                              # CUE configuration database
-│   ├── cue.mod/                      # CUE module definition
-│   ├── schema/                       # Declarative CUE schemas (topology, gateway, consul, root)
-│   └── catalog/                      # Modular catalogs (apgs, environments, extensions, system)
+├── relations/                        # Markdown relational database
+│   ├── environments.md               # Environment, cluster, DC topology
+│   ├── application_groups.md         # Application groups and cells
+│   ├── namespaces.md                 # Namespaces and blue/green regions
+│   ├── services.md                   # Services, versions, and ports
+│   ├── gateways.md                   # Application Gateways (AGW)
+│   ├── http_routes.md                # HTTPRoutes and path bindings
+│   ├── service_defaults.md           # Consul ServiceDefaults
+│   ├── proxy_defaults.md             # Consul cluster-global ProxyDefaults
+│   └── reference_grants.md           # Gateway API ReferenceGrants
 ├── ApplicationGroups/                # Direct GitOps deployment single source of truth
 │   └── <Application>/<Environment>/<Logical-Cell>/<DC>/<OCP-Cluster>/<Config-Items>/
 ├── examples/                         # Reference manifests
@@ -30,15 +36,15 @@ Use the canonical runner script located under `.agents/skills/manifest-managemen
 ```bash
 RUNNER="./.agents/skills/manifest-management/scripts/manifest-mgr"
 
-# Schema validation
+# Schema & relational validation
 $RUNNER vet
 
 # Dashboard overview
 $RUNNER summary
 
 # Bidirectional GitOps synchronization
-$RUNNER sync --to-dir       # Sync CUE database into ApplicationGroups/ hierarchy
-$RUNNER sync --to-cue       # Ingest manual directory changes from ApplicationGroups/ into CUE
+$RUNNER sync --to-dir       # Sync Markdown relations into ApplicationGroups/ hierarchy
+$RUNNER sync --to-md        # Ingest manual directory changes from ApplicationGroups/ into relations
 $RUNNER sync --check        # Audit consistency, drift, and cross-DC symmetry
 
 # Dynamic queries
