@@ -1,0 +1,20 @@
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: ncbs-loyalty-route
+  namespace: cb-core-ss-retail-2
+  labels:
+    apg: ncbs
+    cell: retail
+spec:
+  parentRefs:
+    - name: agw-ncbs-retail-green
+  rules:
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /v1/retail/loyalty/
+      backendRefs:
+        - name: retail-loyalty-canary
+          port: 8080
+          weight: 100

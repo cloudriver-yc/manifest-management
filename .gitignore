@@ -1,0 +1,20 @@
+# Python & Test Caches
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.coverage
+htmlcov/
+
+# OS Artifacts
+.DS_Store
+Thumbs.db
+
+# Virtual Environments
+.venv/
+venv/
+ENV/
+
+# Temporary & Archive files
+*.tar.gz
+*.zip

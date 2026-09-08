@@ -1,0 +1,17 @@
+apiVersion: consul.hashicorp.com/v1alpha1
+kind: ServiceDefaults
+metadata:
+  name: cb-payment-service
+  namespace: cbcoresg-com-1
+  labels:
+    apg: ncbs
+    cell: common
+  annotations:
+    manifest.management/agw: agw-ncbs-common-blue
+    manifest.management/path: /v1/common/payment/
+    manifest.management/port: "8080"
+spec:
+  protocol: http
+  meshGateway:
+    mode: local
+  mutualTLSMode: strict
